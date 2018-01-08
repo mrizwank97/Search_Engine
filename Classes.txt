@@ -1,0 +1,65 @@
+class Page implements Serializable{
+    int id;
+    int rank;
+    String title;
+    Page(){
+        id = 0;
+        rank = 0;
+        title = "";
+    }
+    Page(int id, String title, int rank){
+        this.id = id;
+        this.rank = rank;
+        this.title = title;
+    }
+    public void setId(int id){
+        this.id =id;
+    }
+    public void setRank(int rank){
+        this.rank = rank;
+    }
+    public void setTitle(String title){
+        this.title = title;
+    }
+    public String getTitle(){
+        return this.title;
+    }
+    public int getId(){
+        return this.id;
+    }
+    public int getRank(){
+        return this.rank;
+    }
+    public static Comparator<Page> pRank = (Page p1, Page p2) -> {
+        int pRank1 = p1.getRank();
+        int pRank2 = p2.getRank();
+        return pRank2-pRank1;
+    };
+}
+class TitleId {
+    int id = 0;
+    String title = new String();
+    boolean heading = false;
+    TitleId(){
+        id = 0;
+        title = null;
+    }
+    public void setId(int id){
+        this.id = id;
+    }
+    public void setTitle(String title){
+        this.title = title;
+    }
+    public void setHeading(boolean heading){
+        this.heading = heading;
+    }
+    public int getId(){
+        return id;
+    }
+    public String getTitle(){
+        return title;
+    }
+    public boolean getHeading(){
+        return heading;
+    }
+}
