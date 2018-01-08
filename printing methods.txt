@@ -1,0 +1,54 @@
+package searchengine;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentMap;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.mapdb.DB;
+import org.mapdb.DBMaker;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class SearchEngine{
+   public static void main(String[] args) {
+      try {
+            File inputFile = new File("D:\\asd.xml");
+            SAXParserFactory factory = SAXParserFactory.newInstance();
+            SAXParser saxParser = factory.newSAXParser();
+            UserHandler userhandler = new UserHandler();
+            saxParser.parse(inputFile, userhandler);
+            userhandler.makeHash();
+            userhandler.closeFiles();
+        } catch (Exception e) {
+         e.printStackTrace();
+        }  
+        DB db = DBMaker.fileDB("D:\\Fall 2017\\DSA\\rank\\rankhash.db").make();
+        ConcurrentMap map1 = db.hashMap("rankhash").open();
+        printDisplayHash(map1);
+   }     
+   static void printDisplayHash(ConcurrentMap display){
+        Iterator<String> values = display.keySet().iterator();
+        while(values.hasNext()){
+            String n = (String) values.next();
+            for(int i = 0; i < ((ArrayList)display.get(n)).size(); i++){
+                System.out.println(n + " -> " + " Id: " + ((Page)((ArrayList)display.get(n)).get(i)).getId() + 
+                " Frequency: " + ((Page)((ArrayList)display.get(n)).get(i)).getFreq() + " Title: " + 
+                ((Page)((ArrayList)display.get(n)).get(i)).getTitle() + " Rank: " + ((Page)((ArrayList)display.get(n)).get(i)).getRank());
+            }
+        }
+    }
+        
+    static void showHash(ConcurrentMap display){
+        Iterator<String> values = display.keySet().iterator();
+        while(values.hasNext()){
+            String n = (String) values.next();
+            for(int i = 0; i < ((ArrayList)display.get(n)).size(); i++){
+                System.out.println(n + " -> id " + 
+                ((TitleId)((ArrayList)display.get(n)).get(i)).getId()+ " Title -> "
+                +((TitleId)((ArrayList)display.get(n)).get(i)).getTitle());
+            }
+        }
+    }
+}
