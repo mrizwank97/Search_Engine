@@ -1,0 +1,38 @@
+void makeHash(){ 
+        Enumeration<String> values = ht.keys();
+        while(values.hasMoreElements()){
+            String n = values.nextElement();
+	    Page page = new Page();
+            ArrayList<Page> p = new ArrayList<>();
+            int temp = 1;
+            for(int i = 0; i < ht.get(n).size(); i++){
+                if(i < ht.get(n).size() - 1 && (ht.get(n).get(i).getId() == ht.get(n).get(i+1).getId()))
+                    temp++;
+                else{
+                    page.setId(ht.get(n).get(i).getId());
+                    if(ht.get(n).get(i).getTitle().toLowerCase().equals(n)){
+                        page.setTitle(ht.get(n).get(i).getTitle());
+                        temp = temp * 50;
+                        page.setRank(temp);
+                    }
+                    else if(ht.get(n).get(i).getTitle().toLowerCase().contains(n)){
+                        page.setTitle(ht.get(n).get(i).getTitle());
+                        temp = temp * 25;
+                        page.setRank(temp);
+                    }
+                    if(ht.get(n).get(i).getHeading()){
+                        temp = temp * 10;
+                        page.setRank(temp);
+                    }
+                    else{
+                        page.setTitle(ht.get(n).get(i).getTitle());
+                        page.setRank(temp);
+                    }
+                    p.add(page);
+                    page = new Page();
+                    temp = 1;
+                }
+            }
+            map1.put(n, p);
+        } 
+    }
