@@ -1,0 +1,331 @@
+package searchengine;
+import java.io.File;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.mapdb.DB;
+import org.mapdb.DBMaker;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+public class SearchEngine{
+   public static void main(String[] args) {
+        try {
+            File inputFile = new File("file.xml");
+            SAXParserFactory factory = SAXParserFactory.newInstance();
+            SAXParser saxParser = factory.newSAXParser();
+            UserHandler userhandler = new UserHandler();
+            saxParser.parse(inputFile, userhandler);
+            userhandler.makeHash();
+            userhandler.closeFiles();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        DB db = DBMaker.fileDB("rankhash.db").make();
+        ConcurrentMap map1 = db.hashMap("rankhash").open();
+        Scanner in = new Scanner(System.in);
+        System.out.print("Enter your Query: "); 
+        String query = in.nextLine();
+        query = query.toLowerCase();
+        String[] word = query.split(" ");
+        if(word.length > 1){
+            System.out.println("Results are as follow:- ");
+            long start = System.currentTimeMillis();
+            long end = 0;
+            int count = 0;
+            LinkedHashSet<String> res = search(word,map1);
+            for (Iterator it = res.iterator(); it.hasNext();) {
+                String str = (String) it.next();
+                if(str.equals("")){
+                        continue;
+                }
+                count++;
+                System.out.println("https://simple.wikipedia.org/wiki/" + str.replace(" ", "_"));
+            }
+            end = System.currentTimeMillis();
+            System.out.println(count + " results returned in " +(end - start) + " milliseconds");
+        }
+        else{
+            System.out.println("Results are as follow:- ");
+            long start = System.currentTimeMillis();
+            long end = 0;
+            int count = 0;
+            try{
+                ArrayList<Page> p = (ArrayList)map1.get(query);
+                for(int i = 0; i < p.size(); i++){
+                    if(count >= 1000){
+                        break;
+                    }
+                    if(p.get(i).getTitle().equals("")){
+                        continue;
+                    }
+                    count++;   
+                    System.out.println("https://simple.wikipedia.org/wiki/" + p.get(i).getTitle().replace(" ", "_"));
+                }
+                end = System.currentTimeMillis();
+            }catch(Exception e){
+                System.out.println("No such word found");
+            }
+            System.out.println(count + " results returned in " +(end - start) + " milliseconds");
+        }
+   }     
+    public static LinkedHashSet<String> search(String word[], ConcurrentMap map) {
+        LinkedHashSet<String> s1 = new LinkedHashSet<>();
+        LinkedHashSet<String> s2 = new LinkedHashSet<>();
+        int noOfWord = word.length;
+        for(int i = 0;i < noOfWord; i++){
+            if(map.containsKey(word[i])){
+                ArrayList<Page> p = (ArrayList)map.get(word[i]);
+                int n = p.size();
+                if(n>500){
+                    n=500;
+                }
+                for (int j = 0; j < n; j++) {    
+                s1.add(p.get(j).getTitle());
+                }
+                if(i == 0){
+                    s2.addAll(s1);
+                    s1.clear();
+                }else{
+                    s2.addAll((LinkedHashSet<String>) intersection(s1,s2));
+                    s1.clear();
+                }
+            }
+        }
+        //s2.addAll(s1);
+        return s2;
+    }
+    @SuppressWarnings("unchecked")
+    private static Set<String> intersection(LinkedHashSet<String> setA, LinkedHashSet<String> setB){
+        LinkedHashSet <String> setC = new LinkedHashSet<>();
+        setC.addAll(setA);
+        setA.stream().filter((str) -> (!setB.contains(str))).forEachOrdered((str) -> {
+            setC.remove(str);
+        });    
+        return setC;
+    }   
+}
+class UserHandler extends DefaultHandler implements Serializable{
+    long count = 0;
+    DB db = DBMaker.fileDB("rankhash.db").make();
+    ConcurrentMap map1 = db.hashMap("rankhash").create();
+    Hashtable<String, ArrayList<TitleId>> ht = new Hashtable<>(); 
+    Integer id;
+    String text= "";
+    String title = "";
+    boolean take = true;
+    boolean bTitle = false;
+    boolean bId = false;
+    boolean bText = false;
+    TitleId trying = new TitleId();
+    String heading = "";
+    @Override
+    public void startElement(
+        String uri, String localName, String qName, Attributes attributes) throws SAXException {
+        if (qName.equalsIgnoreCase("title")) {
+            bTitle = true;
+        }else if (qName.equalsIgnoreCase("id")) {
+            bId = true;
+         }else if (qName.equalsIgnoreCase("text")) {
+            bText = true;
+        }
+    }
+    @Override
+    public void characters(char ch[], int start, int length) throws SAXException {
+        if (bTitle) {
+            title= new String(ch, start, length);
+            trying.setTitle(title);
+            bTitle = false;
+        }else if (bId) {
+            if(take){
+            id =  Integer.parseInt( new String(ch, start, length));
+            trying.setId(id);
+            take = false;
+            } 
+            bId = false;
+        } else if (bText) {
+            String info = new String(ch, start, length);
+            text += info;
+            Pattern pat = Pattern.compile("[\\=]{1}[a-zA-Z)0-9\\s]+[\\=]{1}");
+            Matcher mat = pat.matcher(info);
+            while (mat.find()) {
+                heading += mat.group();
+                heading = heading.replaceAll("=", "");
+            }
+        }
+    }
+    @Override   
+    public void endElement(String uri, String localName, String qName) throws SAXException {
+        if (qName.equalsIgnoreCase("text")) {
+            text = text.replaceAll("(?s)\\{\\{(.+?)\\}\\}", " "); //removing links
+            text = text.replaceAll("\\|", " "); //removing vertical lines
+            text = text.replaceAll("-", " "); //removing dashes
+            text = text.replaceAll("\\n", " "); //removing new lines
+            text = text.replaceAll("[^a-zA-Z0-9- \\s]", " ");//removing alphanumeric characters
+            text = text.replaceAll("\\s+", " "); //removing multiple spaces
+            text = text.toLowerCase();
+            String[] words = new String[0];
+            words = text.split(" ");
+            for (String word : words) {
+                if(heading.toLowerCase().contains(word)){
+                    trying.setHeading(true);
+                }
+                else
+                    trying.setHeading(false);      
+                if(" ".equals(word) || "the".equals(word) || "is".equals(word) || "which".equals(word) || "a".equals(word) || "about".equals(word) || "above".equals(word) || "after".equals(word) || "again".equals(word) || "against".equals(word)||
+                    "all".equals(word) || "am".equals(word) || "an".equals(word) || "and".equals(word) || "any".equals(word) || "are".equals(word) || "as".equals(word) || "at".equals(word) || "be".equals(word) || "because".equals(word) ||
+                    "been".equals(word) || "before".equals(word) || "being".equals(word) || "below".equals(word) || "between".equals(word) || "both".equals(word) || "but".equals(word) || "by".equals(word) ||
+                    "could".equals(word) ||"did".equals(word) ||"do".equals(word) ||"does".equals(word) ||"doing".equals(word) ||"down".equals(word) ||"during".equals(word) ||"each".equals(word) ||"few".equals(word) ||
+                    "for".equals(word) || "from".equals(word) || "further".equals(word) ||"had".equals(word) ||"has".equals(word) || "have".equals(word) || "having".equals(word) || "he".equals(word) || "her".equals(word) ||
+                    "here".equals(word) ||"herself".equals(word) ||"him".equals(word) ||"himself".equals(word) ||"his".equals(word) ||"how".equals(word) ||"I".equals(word) || "if".equals(word) || "in".equals(word) ||
+                    "into".equals(word) || "is".equals(word) || "it".equals(word) || "itself".equals(word) ||"let".equals(word) ||"me".equals(word) ||"more".equals(word) ||"most".equals(word) ||"my".equals(word) ||"myself".equals(word) ||
+                    "nor".equals(word) ||"of".equals(word) ||"on".equals(word) ||"once".equals(word) || "only".equals(word) ||"or".equals(word) || "other".equals(word) || "ought".equals(word) || "our".equals(word) ||
+                    "ourselves".equals(word) || "out".equals(word) || "over".equals(word) || "own".equals(word) || "same".equals(word) || "she".equals(word) || "should".equals(word) ||
+                    "so".equals(word) || "some".equals(word) || "such".equals(word) || "than".equals(word) || "that".equals(word) ||"the".equals(word) || "their".equals(word) || "them".equals(word) ||
+                    "themselves".equals(word) || "then".equals(word) || "there".equals(word) || "these".equals(word) || "they".equals(word) || "this".equals(word) || "those".equals(word) ||
+                    "through".equals(word) || "to".equals(word) || "too".equals(word) || "under".equals(word) || "until".equals(word) || "up".equals(word) || "very".equals(word) || "was".equals(word) ||
+                    "we".equals(word) ||"were".equals(word) || "what".equals(word) ||"when".equals(word) ||"where".equals(word) ||"which".equals(word) ||"while".equals(word) ||"who".equals(word) || "whom".equals(word) ||
+                    "why".equals(word) ||"with".equals(word) ||"would".equals(word) || "you".equals(word) || "your".equals(word) || "yourself".equals(word) || "yourselves".equals(word))
+                {        
+                    //do nothing
+                }
+                else if (ht.containsKey(word)) {
+                    ht.get(word).add(trying);
+                }
+                else {
+                    ArrayList<TitleId> temp = new ArrayList<>();
+                    temp.add(trying);
+                    ht.put(word, temp);      
+                }
+            }
+            trying = new TitleId();
+            id = 0;
+            text = "";
+            title = "";
+            bText = false;
+            heading = "";
+            take = true;
+        }
+    }    
+    void makeHash(){ 
+        Enumeration<String> values = ht.keys();
+        while(values.hasMoreElements()){
+            String n = values.nextElement();
+	    Page page = new Page();
+            ArrayList<Page> p = new ArrayList<>();
+            int temp = 1;
+            for(int i = 0; i < ht.get(n).size(); i++){
+                if(i < ht.get(n).size() - 1 && (ht.get(n).get(i).getId() == ht.get(n).get(i+1).getId()))
+                    temp++;
+                else{
+                    page.setId(ht.get(n).get(i).getId());
+                    if(ht.get(n).get(i).getTitle().toLowerCase().equals(n)){
+                        page.setTitle(ht.get(n).get(i).getTitle());
+                        temp = temp * 500;
+                        page.setRank(temp);
+                    }
+                    else if(ht.get(n).get(i).getTitle().toLowerCase().contains(n)){
+                        page.setTitle(ht.get(n).get(i).getTitle());
+                        temp = temp * 50;
+                        page.setRank(temp);
+                    }
+                    if(ht.get(n).get(i).getHeading()){
+                        temp = temp * 25;
+                        page.setRank(temp);
+                    }
+                    else{
+                        page.setTitle(ht.get(n).get(i).getTitle());
+                        page.setRank(temp);
+                    }
+                    p.add(page);
+                    page = new Page();
+                    temp = 1;
+                }
+            }
+            Collections.sort(p,Page.pRank);
+            map1.put(n, p);
+        } 
+    }
+    public void closeFiles(){
+           ht.clear();
+           db.close();   
+    }
+}
+class Page implements Serializable{
+    int id;
+    int rank;
+    String title;
+    Page(){
+        id = 0;
+        rank = 0;
+        title = "";
+    }
+    Page(int id, String title, int rank){
+        this.id = id;
+        this.rank = rank;
+        this.title = title;
+    }
+    public void setId(int id){
+        this.id =id;
+    }
+    public void setRank(int rank){
+        this.rank = rank;
+    }
+    public void setTitle(String title){
+        this.title = title;
+    }
+    public String getTitle(){
+        return this.title;
+    }
+    public int getId(){
+        return this.id;
+    }
+    public int getRank(){
+        return this.rank;
+    }
+    public static Comparator<Page> pRank = (Page p1, Page p2) -> {
+        int pRank1 = p1.getRank();
+        int pRank2 = p2.getRank();
+        return pRank2-pRank1;
+    };
+}
+class TitleId {
+    int id = 0;
+    String title = new String();
+    boolean heading = false;
+    TitleId(){
+        id = 0;
+        title = null;
+    }
+    public void setId(int id){
+        this.id = id;
+    }
+    public void setTitle(String title){
+        this.title = title;
+    }
+    public void setHeading(boolean heading){
+        this.heading = heading;
+    }
+    public int getId(){
+        return id;
+    }
+    public String getTitle(){
+        return title;
+    }
+    public boolean getHeading(){
+        return heading;
+    }
+}
