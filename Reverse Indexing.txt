@@ -1,0 +1,145 @@
+package dsaproject1;
+import java.io.*;
+import java.util.*;
+import java.util.Map;
+import java.util.Map.Entry;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class DsaProject1 {
+
+    public static void main(String[] args) {
+        try {
+         File inputFile = new File("simplewiki.xml");
+         SAXParserFactory factory = SAXParserFactory.newInstance();
+         SAXParser saxParser = factory.newSAXParser();
+        UserHandler userhandler = new UserHandler();
+         saxParser.parse(inputFile, userhandler);
+      }
+      catch (Exception e) {
+         e.printStackTrace();
+      }
+    }  
+}
+class UserHandler extends DefaultHandler{
+
+boolean babbas=false;    
+boolean btitle = false;
+boolean bid = false;
+boolean btext= false;
+boolean bpage= false;
+
+String []commonwords={"a","about","all","also","and","as","at","be","because","but","by","can","come","could","day","do","even","find","first","for","from","get","give","go","have","he","her","here","him","his","how","I","if","in","into","it","its","just","know","like","look","make","man","many","me","more","my","new","no","not","now","of","on","one","only","or","other","our","out","people","say","see","she","so","some","take","tell","that","the","their","them","then","there","these","they","thing","think","this","those","time","to","two","up","use","very","want","way","we","well","what","when","which","who","will","with","would","year","you","your"};
+Hashtable<String, ArrayList> ap = new Hashtable<String, ArrayList>();
+int result;
+int count=1;
+String text;//In this I am storing text without any brackets,hyphens and bars etc
+
+
+
+@Override
+public void startElement(String uri, String localName, String qName, Attributes attributes)throws SAXException {
+    if(qName.equalsIgnoreCase("abbas")) {
+        babbas=true;
+    }
+    else if(qName.equalsIgnoreCase("page")) {
+        bpage=true;
+    }
+    else if (qName.equalsIgnoreCase("title")) {
+        btitle=true;
+    }
+    else if (qName.equalsIgnoreCase("id")) {
+      // count++;
+       // if(count==1){
+            bid=true;
+       // }
+        //count++;
+    }
+    else if(qName.equalsIgnoreCase("text")){
+        btext=true;
+    }
+}
+@Override
+	public void startDocument() throws SAXException {
+		System.out.println("Start parsing the document");}
+
+@Override
+public void characters(char ch[], int start, int length) throws SAXException {
+    String temp=new String(ch, start, length);
+    String articleText = temp;
+    articleText = articleText.replaceAll("  ", " ");//converting double spaces into single space
+    articleText = articleText.replaceAll("(?s)<ref(.+?)</ref>", " "); //remove references
+    articleText = articleText.replaceAll("(?s)\\{\\{(.+?)\\}\\}", " "); //remove links underneath headings
+    articleText = articleText.replaceAll("(?s)==See also==.+", " "); //remove everything after see also
+    articleText = articleText.replaceAll("\\|", " "); //Separate multiple links
+    articleText = articleText.replaceAll("\\n", " "); //remove new lines
+    articleText = articleText.replaceAll("-", " ");
+    articleText = articleText.replaceAll("[^a-zA-Z0-9- \\s]", " "); //remove all non alphanumeric except dashes and spaces
+    articleText = articleText.replaceAll("\\s+", " ");
+    text+=articleText;
+    if (btitle) {
+           //System.out.println("Title: "+new String(ch, start, length));
+           btitle = false;
+        }
+    else if (bid){
+       count --;
+       if(count == 0){
+            result = Integer.parseInt(a);
+           count+=3;
+       }
+        bid =false;
+    }
+}
+@Override
+	public void endDocument() throws SAXException {
+		print(ap);
+		System.out.print("\nEnd parsing the document\n");}
+
+@Override
+public void endElement(String uri,String localName, String qName) throws SAXException {
+    if (qName.equalsIgnoreCase("page")) {
+    	btext=false;
+    	bpage=false;
+        String[] name= text.split(" ");
+        text="";
+        for(int i=0;i<name.length;i++){
+            if(!commonwords(name[i])){
+                if(!ap.containsKey(name[i])){
+                   ap.put(name[i],new ArrayList<Integer>());
+                   ap.get(name[i]).add(result);
+                    }
+               else if(!ap.get(name[i]).contains(result)){
+                   ap.get(name[i]).add(result);
+                  
+            }
+            }
+        }
+      
+  
+    }
+}
+public void print(Hashtable<String, ArrayList> map2){
+		for(Entry<String, ArrayList> entry: map2.entrySet()){
+			ArrayList<Integer> values= entry.getValue();
+			String key = entry.getKey();
+			
+			
+                        System.out.print(key+"->"+values);
+                        System.out.print("\n");
+			//System.out.println(" , Values = "+values);
+		}
+	}
+public boolean commonwords(String a){
+    for(int i=0;i<commonwords.length;i++){
+        if(a.equals(commonwords[i])){
+            return true;
+        }
+    }
+    return false;
+}
+
+
+}
