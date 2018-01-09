@@ -1,0 +1,30 @@
+public static void main(String[] args) {
+        
+	DB db = DBMaker.fileDB("rankhash.db").make();
+        ConcurrentMap map1 = db.hashMap("rankhash").open();
+        Scanner in = new Scanner(System.in);
+        System.out.print("Enter your Query: "); 
+        String query = in.nextLine();
+        query = query.toLowerCase();
+        System.out.println("Results are as follow:- ");
+        long start = System.currentTimeMillis();
+        long end = 0;
+        int count = 0;
+        try{
+            ArrayList<Page> p = (ArrayList)map1.get(query);
+            for(int i = 0; i < p.size(); i++){
+                if(count >= 1000){
+                    break;
+                }
+                if(p.get(i).getTitle().equals("")){
+                    continue;
+                }
+                count++;   
+                System.out.println("https://simple.wikipedia.org/wiki/" + p.get(i).getTitle().replace(" ", "_"));
+            }
+            end = System.currentTimeMillis();
+        }catch(Exception e){
+            System.out.println("No such word found");
+        }
+        System.out.println(count + " results returned in " +(end - start) + " milliseconds");
+} 
